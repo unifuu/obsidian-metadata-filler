@@ -1,0 +1,21 @@
+node_modules/
+data.json
+.vault-path
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+.secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local OS/editor files
+.DS_Store
+*.swp
+
+# npm/debug logs
+npm-debug.log*
+*.log

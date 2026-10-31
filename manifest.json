@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-metadata-filler",
+  "name": "Metadata Filler",
+  "version": "1.2.0",
+  "minAppVersion": "1.0.0",
+  "description": "Fills blank game or anime note properties using IGDB, AniList, Jikan, and Bangumi fallbacks.",
+  "author": "unifuu",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
