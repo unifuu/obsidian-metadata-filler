@@ -16,6 +16,7 @@ import { AnimeChoiceModal, PickerCandidate } from "./anime-modal";
 import { BookChoiceModal } from "./book-modal";
 import { searchBooks, resolveBookFields, WikidataCandidate, ResolvedBookFields } from "./wikidata";
 import { findOpenLibraryMetadata } from "./openlibrary";
+import { GoogleBooksCandidate, searchGoogleBooks } from "./googlebooks";
 
 const GAME_TYPE = "[[🎮]]";
 const ANIME_TYPE = "[[📺]]";
@@ -302,7 +303,27 @@ export default class MetadataFillerPlugin extends Plugin {
 	}
 
 	private async fillBook(file: TFile, title: string) {
-		const notice = new Notice(`Searching Wikidata for "${title}"...`, 0);
+		const notice = new Notice(`Searching Google Books for "${title}"...`, 0);
+		let googleResults: GoogleBooksCandidate[] = [];
+		try {
+			googleResults = await searchGoogleBooks(title);
+		} catch (error) {
+			console.warn("Google Books search failed; trying Wikidata:", error);
+			notice.setMessage(`Google Books unavailable, trying Wikidata for "${title}"...`);
+		}
+		if (googleResults.length > 0) {
+			notice.hide();
+			if (googleResults.length === 1 || !this.settings.alwaysAskWhenMultiple) {
+				await this.applyGoogleBookToFile(file, googleResults[0]);
+				return;
+			}
+			new BookChoiceModal(this.app, googleResults, async (candidate) => {
+				await this.applyGoogleBookToFile(file, candidate);
+			}).open();
+			return;
+		}
+
+		notice.setMessage(`Searching Wikidata for "${title}"...`);
 		let results: WikidataCandidate[];
 		try {
 			results = await searchBooks(title);
@@ -342,25 +363,47 @@ export default class MetadataFillerPlugin extends Plugin {
 		}).open();
 	}
 
+	private async applyGoogleBookToFile(file: TFile, candidate: GoogleBooksCandidate) {
+		const fields: ResolvedBookFields = { ...candidate.fields };
+		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+		const author = fields.author?.map((value) => value.replace(/^\[\[|\]\]$/g, "")).join(", ");
+		try {
+			const openLibrary = await findOpenLibraryMetadata(candidate.label, author, isEmptyValue(frontmatter?.chapters));
+			fields.author ??= openLibrary.author;
+			fields.released ??= openLibrary.released;
+			fields.cover = openLibrary.cover ?? fields.cover;
+			fields.chapters ??= openLibrary.chapters;
+		} catch (error) {
+			console.warn("Open Library book lookup failed; using available Google Books metadata:", error);
+			new Notice(`Open Library lookup failed; using available Google Books metadata: ${error instanceof Error ? error.message : String(error)}`);
+		}
+		await this.applyBookFields(file, candidate.label, fields);
+	}
+
 	private async applyBookToFile(file: TFile, title: string, candidate: WikidataCandidate) {
 		const notice = new Notice("Fetching book details from Wikidata...", 0);
 		let fields: ResolvedBookFields;
 		try {
 			fields = await resolveBookFields(candidate.id);
-			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
-			if (!fields.author || fields.released === undefined || !fields.cover || isEmptyValue(frontmatter?.chapters)) {
-				const author = fields.author?.map((value) => value.replace(/^\[\[|\]\]$/g, "")).join(", ");
-				const openLibrary = await findOpenLibraryMetadata(title, author);
-				fields.author ??= openLibrary.author;
-				fields.released ??= openLibrary.released;
-				fields.cover ??= openLibrary.cover;
-				fields.chapters ??= openLibrary.chapters;
-			}
 		} catch (error) {
 			notice.hide();
 			console.error("Book metadata lookup failed:", error);
 			new Notice(`Could not fetch book metadata: ${error instanceof Error ? error.message : String(error)}`);
 			return;
+		}
+
+		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+		const author = fields.author?.map((value) => value.replace(/^\[\[|\]\]$/g, "")).join(", ");
+		notice.setMessage("Checking Open Library for a book cover...");
+		try {
+			const openLibrary = await findOpenLibraryMetadata(title, author, isEmptyValue(frontmatter?.chapters));
+			fields.author ??= openLibrary.author;
+			fields.released ??= openLibrary.released;
+			fields.cover = openLibrary.cover ?? fields.cover;
+			fields.chapters ??= openLibrary.chapters;
+		} catch (error) {
+			console.warn("Open Library book lookup failed; using available Wikidata metadata:", error);
+			new Notice(`Open Library lookup failed; using available Wikidata metadata: ${error instanceof Error ? error.message : String(error)}`);
 		}
 		notice.hide();
 

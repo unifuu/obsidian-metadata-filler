@@ -4,7 +4,7 @@ Fills blank metadata based on the note's `type` property:
 
 - `type: "[[🎮]]"` uses IGDB for game metadata.
 - `type: "[[📺]]"` uses AniList first, then Jikan/MyAnimeList, then Bangumi if an earlier service is unavailable or has no results. Bangumi also supplies cover and Traditional Chinese title enrichment.
-- `type: "[[📚]]"` searches Wikidata for book metadata, with Open Library as a cover fallback.
+- `type: "[[📚]]"` searches Google Books for book metadata, with Wikidata and Open Library fallbacks.
 
 Run **Fill metadata based on note type** from the command palette. Configure the IGDB Client ID and Client Secret in the plugin settings. Existing property values are never overwritten.
 
@@ -16,10 +16,11 @@ Anime covers are sourced from Bangumi when available.
 
 Book metadata is looked up using the existing `title` property. Blank `author`,
 `origin`, `series`, `released`, `chapters`, `cover`, and `aliases` properties are
-filled from Wikidata and Open Library. If Wikidata has no matching item, an
-exact-title Open Library result can still fill `author`, `released`, and `cover`.
-Open Library also supplies a cover when Wikidata has no cover. Chapter totals are
-written as `YYYY-MM-DD`; year-only publication dates use January 1. Chapter
+filled from Google Books, Wikidata, and Open Library. Google Books is searched first
+to better cover current technical and career books (for example, `AI Engineering - Chip Huyen`).
+If a title ends with ` - Author`, that author is included in the Google Books search.
+Open Library covers are preferred when available. Publication dates are written as
+`YYYY-MM-DD`; year-only dates use January 1. Chapter
 totals are filled only when an exact-title Open Library edition
 has a table of contents with explicitly numbered chapter entries. Chapter
 counts are not consistently cataloged, so the property remains blank when no
@@ -31,7 +32,8 @@ are found** setting controls whether a chooser is shown.
 
 - `src/main.ts`: type routing and frontmatter updates
 - `src/igdb.ts`: IGDB game search and field resolution
-- `src/wikidata.ts`: Wikidata book search and field resolution
+- `src/googlebooks.ts`: Google Books search and field resolution
+- `src/wikidata.ts`: Wikidata book search and field resolution fallback
 - `src/openlibrary.ts`: book metadata fallback and available table-of-contents chapter counts
 - `src/book-modal.ts`: book result chooser
 - `src/anilist.ts`: AniList anime search and field resolution

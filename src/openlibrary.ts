@@ -43,7 +43,8 @@ function countExplicitChapters(contents: OpenLibraryTocEntry[] | undefined): num
 /** Look up a cover and explicit chapter entries from Open Library when available. */
 export async function findOpenLibraryMetadata(
 	title: string,
-	author?: string
+	author?: string,
+	includeChapters = true
 ): Promise<OpenLibraryMetadata> {
 	const params = new URLSearchParams({
 		title,
@@ -60,7 +61,7 @@ export async function findOpenLibraryMetadata(
 
 	const exactTitle = normalizeTitle(title);
 	const exactDocs = docs.filter((doc) => doc.title && normalizeTitle(doc.title) === exactTitle);
-	const exactDoc = exactDocs[0];
+	const exactDoc = exactDocs.find((doc) => doc.cover_i !== undefined && doc.cover_i > 0) ?? exactDocs[0];
 	if (exactDoc?.author_name?.length) {
 		metadata.author = [...new Set(exactDoc.author_name)].map((author) => `[[${author}]]`);
 	}
@@ -72,9 +73,9 @@ export async function findOpenLibraryMetadata(
 		metadata.cover = `https://covers.openlibrary.org/b/id/${exactDoc.cover_i}-L.jpg`;
 	}
 
-	const editionKeys = exactDocs
-		.flatMap((doc) => doc.edition_key ?? [])
-		.slice(0, 5);
+	if (!includeChapters) return metadata;
+
+	const editionKeys = exactDocs.flatMap((doc) => doc.edition_key ?? []).slice(0, 5);
 	for (const editionKey of editionKeys) {
 		try {
 			const editionResponse = await requestUrl({

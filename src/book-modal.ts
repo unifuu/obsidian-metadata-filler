@@ -1,25 +1,30 @@
 import { App, FuzzySuggestModal } from "obsidian";
-import type { WikidataCandidate } from "./wikidata";
 
-export class BookChoiceModal extends FuzzySuggestModal<WikidataCandidate> {
+interface BookChoiceCandidate {
+	id: string;
+	label: string;
+	description?: string;
+}
+
+export class BookChoiceModal<T extends BookChoiceCandidate> extends FuzzySuggestModal<T> {
 	constructor(
 		app: App,
-		private candidates: WikidataCandidate[],
-		private onChoose: (candidate: WikidataCandidate) => void
+		private candidates: T[],
+		private onChoose: (candidate: T) => void
 	) {
 		super(app);
 		this.setPlaceholder("Multiple results found. Choose the correct book/work…");
 	}
 
-	getItems(): WikidataCandidate[] {
+	getItems(): T[] {
 		return this.candidates;
 	}
 
-	getItemText(candidate: WikidataCandidate): string {
+	getItemText(candidate: T): string {
 		return `${candidate.label}${candidate.description ? ` — ${candidate.description}` : ""} (${candidate.id})`;
 	}
 
-	onChooseItem(candidate: WikidataCandidate): void {
+	onChooseItem(candidate: T): void {
 		this.onChoose(candidate);
 	}
 }
