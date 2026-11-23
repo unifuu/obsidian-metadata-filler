@@ -34,7 +34,6 @@ interface WikidataSearchResponse {
 export interface ResolvedBookFields {
 	author?: string[];
 	origin?: string;
-	series?: string;
 	released?: string;
 	chapters?: number;
 	cover?: string;
@@ -214,13 +213,6 @@ export async function resolveBookFields(qid: string): Promise<ResolvedBookFields
 	fields.origin = await getOrigin(
 		originIds.length > 0 ? originIds : getEntityIds(claims, "P17")
 	);
-
-	const seriesIds = getEntityIds(claims, "P179");
-	if (seriesIds.length > 0) {
-		const labels = await getEnglishLabels(seriesIds);
-		const series = seriesIds.map((id) => labels[id]).filter(Boolean);
-		if (series.length > 0) fields.series = series.join(", ");
-	}
 
 	fields.released = getEarliestDate(claims, "P577") ?? getEarliestDate(claims, "P571");
 

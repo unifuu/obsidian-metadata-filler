@@ -199,7 +199,6 @@ export default class MetadataFillerPlugin extends Plugin {
 
 				trySet("author");
 				trySet("origin");
-				trySet("series");
 				trySet("released");
 				trySet("chapters");
 				trySet("cover");

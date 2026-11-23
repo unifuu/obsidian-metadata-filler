@@ -5,6 +5,8 @@ import { originCountryToAliasLanguage, resolveOriginAlias } from "./aliases";
 import { toTraditional } from "./textUtils";
 import { findBangumiGameChineseName } from "./bangumi";
 
+const MAX_GAME_SEARCH_RESULTS = 10;
+
 export interface IGDBGameResult {
 	id: number;
 	name: string;
@@ -115,7 +117,7 @@ fields name, first_release_date, cover.image_id, platforms.name,
        involved_companies.developer, involved_companies.company.name,
        involved_companies.company.country, alternative_names.comment,
        game_localizations.name, game_localizations.region.name;
-limit 50;
+limit ${MAX_GAME_SEARCH_RESULTS};
 		`.trim();
 
 		const res = await requestUrl({
@@ -130,13 +132,12 @@ limit 50;
 		});
 
 		const ranked = rankSearchResults(res.json as IGDBGameResult[], title);
-		const enriched = await Promise.all(
-			ranked.slice(0, 10).map(async (game) => ({
+		return Promise.all(
+			ranked.map(async (game) => ({
 				...game,
 				bangumiTitle: await findBangumiGameChineseName(game.name),
 			}))
 		);
-		return [...enriched, ...ranked.slice(10)];
 	}
 
 	/** Convert one IGDB result into frontmatter fields to write to the note. */
