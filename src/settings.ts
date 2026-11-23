@@ -34,7 +34,7 @@ export class MetadataFillerSettingTab extends PluginSettingTab {
 		containerEl.createEl("h2", { text: "Metadata Filler Settings" });
 
 		const info = containerEl.createEl("p");
-		info.innerHTML = "Game metadata uses IGDB; anime metadata uses AniList and Bangumi.";
+		info.innerHTML = "Game metadata uses IGDB; book metadata uses Google Books, Wikidata, and Open Library.";
 
 		new Setting(containerEl)
 			.setName("IGDB Client ID")
@@ -71,7 +71,7 @@ export class MetadataFillerSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Use Traditional Chinese for aliases")
-			.setDesc("When enabled, use the Chinese title for game and anime aliases regardless of origin. Otherwise, use the origin-language title.")
+			.setDesc("When enabled, use the Chinese title for game aliases regardless of origin. Otherwise, use the origin-language title.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.aliasesInTraditionalChinese)

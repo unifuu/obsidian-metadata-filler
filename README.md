@@ -3,16 +3,11 @@
 Fills blank metadata based on the note's `type` property:
 
 - `type: "[[🎮]]"` uses IGDB for game metadata.
-- `type: "[[📺]]"` uses AniList first, then Jikan/MyAnimeList, then Bangumi if an earlier service is unavailable or has no results. Bangumi also supplies cover and Traditional Chinese title enrichment.
 - `type: "[[📚]]"` searches Google Books for book metadata, with Wikidata and Open Library fallbacks.
 
 Run **Fill metadata based on note type** from the command palette. Configure the IGDB Client ID and Client Secret in the plugin settings. Existing property values are never overwritten.
 
 Game matching returns up to 50 results, ranks exact and base-title matches ahead of DLC entries, and shows developer and platform details in the chooser. Game platforms use the canonical notes `Android`, `iOS`, `Nintendo Switch`, `PlayStation`, and `Windows`. Game aliases use titles in the developer's origin language when available; Chinese aliases are converted to Traditional Chinese, and other origins fall back to IGDB's canonical title.
-
-Anime aliases use the title in the provider's origin language when available; Chinese titles are converted to Traditional Chinese, while Japanese and Korean titles retain their native script. Enable **Use Traditional Chinese for aliases** in plugin settings to use Chinese titles for games and anime from any origin.
-
-Anime covers are sourced from Bangumi when available.
 
 Book metadata is looked up using the existing `title` property. Blank `author`,
 `origin`, `series`, `released`, `chapters`, `cover`, and `aliases` properties are
@@ -36,9 +31,7 @@ are found** setting controls whether a chooser is shown.
 - `src/wikidata.ts`: Wikidata book search and field resolution fallback
 - `src/openlibrary.ts`: book metadata fallback and available table-of-contents chapter counts
 - `src/book-modal.ts`: book result chooser
-- `src/anilist.ts`: AniList anime search and field resolution
-- `src/jikan.ts`: Jikan/MyAnimeList fallback search and field resolution
-- `src/bangumi.ts`: Bangumi fallback search and detail resolution
+- `src/bangumi.ts`: Bangumi game title enrichment
 - `src/settings.ts`: shared settings tab
 
 ## Development and deployment

@@ -1,37 +1,14 @@
 import { Notice, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, MetadataFillerSettings, MetadataFillerSettingTab } from "./settings";
 import { IGDBClient, IGDBGameResult, ResolvedGameFields } from "./igdb";
-import { countryAlpha2ToName } from "./countries";
 import { GameChoiceModal } from "./game-modal";
-import { searchAnime, fetchAnimeDetails, AniListCandidate } from "./anilist";
-import { searchAnimeJikan, fetchAnimeDetailsJikan, JikanCandidate } from "./jikan";
-import { resolveAnimeOriginAlias } from "./anime-aliases";
-import {
-	findBangumiSubject,
-	searchAnimeBangumi,
-	fetchAnimeDetailsBangumi,
-	BangumiCandidate,
-} from "./bangumi";
-import { AnimeChoiceModal, PickerCandidate } from "./anime-modal";
 import { BookChoiceModal } from "./book-modal";
 import { searchBooks, resolveBookFields, WikidataCandidate, ResolvedBookFields } from "./wikidata";
 import { findOpenLibraryMetadata } from "./openlibrary";
 import { GoogleBooksCandidate, searchGoogleBooks } from "./googlebooks";
 
 const GAME_TYPE = "[[🎮]]";
-const ANIME_TYPE = "[[📺]]";
 const BOOK_TYPE = "[[📚]]";
-
-interface ResolvedAnimeFields {
-	studio?: string[];
-	origin?: string;
-	released?: string;
-	episodes?: number;
-	cover?: string;
-	aliases?: string[];
-}
-
-type AnimeSource = "anilist" | "jikan" | "bangumi";
 
 function firstFrontmatterValue(value: unknown): string | undefined {
 	if (Array.isArray(value)) return value[0] ?? undefined;
@@ -73,15 +50,6 @@ export default class MetadataFillerPlugin extends Plugin {
 	async loadSettings() {
 		const data = await this.loadData();
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
-		if (
-			typeof data?.aliasesInTraditionalChinese !== "boolean" &&
-			typeof data?.animeAliasesInTraditionalChinese === "boolean"
-		) {
-			this.settings.aliasesInTraditionalChinese = data.animeAliasesInTraditionalChinese;
-			delete (this.settings as MetadataFillerSettings & { animeAliasesInTraditionalChinese?: boolean })
-				.animeAliasesInTraditionalChinese;
-			await this.saveSettings();
-		}
 	}
 
 	async saveSettings() {
@@ -91,8 +59,8 @@ export default class MetadataFillerPlugin extends Plugin {
 	private async fillActiveFile(file: TFile) {
 		const cache = this.app.metadataCache.getFileCache(file);
 		const type = firstFrontmatterValue(cache?.frontmatter?.type);
-		if (type !== GAME_TYPE && type !== ANIME_TYPE && type !== BOOK_TYPE) {
-			new Notice(`Unsupported note type. Use ${GAME_TYPE} for games, ${ANIME_TYPE} for anime, or ${BOOK_TYPE} for books.`);
+		if (type !== GAME_TYPE && type !== BOOK_TYPE) {
+			new Notice(`Unsupported note type. Use ${GAME_TYPE} for games or ${BOOK_TYPE} for books.`);
 			return;
 		}
 		const title = cache?.frontmatter?.title as string | undefined;
@@ -105,201 +73,9 @@ export default class MetadataFillerPlugin extends Plugin {
 			await this.fillGame(file, title);
 			return;
 		}
-		if (type === ANIME_TYPE) {
-			await this.fillAnime(file, title);
-			return;
-		}
 		if (type === BOOK_TYPE) {
 			await this.fillBook(file, title);
 		}
-	}
-
-	private async fillAnime(file: TFile, title: string) {
-		let results: AniListCandidate[] = [];
-		const notice = new Notice(`Searching AniList for "${title}"...`, 0);
-		try {
-			results = await searchAnime(title);
-		} catch (e) {
-			console.error("AniList search failed, falling back to Jikan:", e);
-		}
-
-		if (results.length > 0) {
-			notice.hide();
-			await this.handleAnimeResults(file, title, "anilist", results);
-			return;
-		}
-
-		notice.setMessage(`AniList unavailable, trying Jikan (MyAnimeList) for "${title}"...`);
-		let jikanResults: JikanCandidate[] = [];
-		try {
-			jikanResults = await searchAnimeJikan(title);
-		} catch (e) {
-			console.error("Jikan search failed, falling back to Bangumi:", e);
-		}
-		if (jikanResults.length === 0) {
-			notice.setMessage(`Jikan found no results, trying Bangumi for "${title}"...`);
-			await this.fillAnimeFromBangumi(file, title, notice);
-			return;
-		}
-		notice.hide();
-		await this.handleAnimeResults(file, title, "jikan", jikanResults);
-	}
-
-	private async fillAnimeFromBangumi(file: TFile, title: string, notice: Notice) {
-		let results: BangumiCandidate[];
-		try {
-			results = await searchAnimeBangumi(title);
-		} catch (e) {
-			notice.hide();
-			console.error(e);
-			new Notice(`AniList, Jikan, and Bangumi searches failed: ${(e as Error).message}`);
-			return;
-		}
-		notice.hide();
-		if (results.length === 0) {
-			new Notice(`No anime matching "${title}" was found on AniList, Jikan, or Bangumi.`);
-			return;
-		}
-		await this.handleAnimeResults(file, title, "bangumi", results);
-	}
-
-	private async handleAnimeResults(
-		file: TFile,
-		searchTitle: string,
-		source: AnimeSource,
-		results: (AniListCandidate | JikanCandidate | BangumiCandidate)[]
-	) {
-		const candidates: PickerCandidate[] = results.map((result) => {
-			if (source === "anilist") {
-				const candidate = result as AniListCandidate;
-				const displayName = candidate.english || candidate.romaji || candidate.native || String(candidate.id);
-				const alternate = candidate.romaji && candidate.romaji !== displayName ? candidate.romaji : undefined;
-				const year = candidate.seasonYear ? String(candidate.seasonYear) : undefined;
-				return { id: candidate.id, displayName, subtitle: [alternate, year].filter(Boolean).join(" - ") || undefined };
-			}
-
-			if (source === "bangumi") {
-				const candidate = result as BangumiCandidate;
-				return {
-					id: candidate.id,
-					displayName: candidate.nameCn || candidate.name,
-					subtitle: candidate.date?.slice(0, 4),
-				};
-			}
-
-			const candidate = result as JikanCandidate;
-			return {
-				id: candidate.malId,
-				displayName: candidate.titleEnglish || candidate.title,
-				subtitle: candidate.year ? String(candidate.year) : undefined,
-			};
-		});
-
-		if (candidates.length === 1 || !this.settings.alwaysAskWhenMultiple) {
-			await this.applyAnimeToFile(file, searchTitle, source, candidates[0]);
-			return;
-		}
-		new AnimeChoiceModal(this.app, candidates, async (chosen) => {
-			await this.applyAnimeToFile(file, searchTitle, source, chosen);
-		}).open();
-	}
-
-	private async applyAnimeToFile(
-		file: TFile,
-		title: string,
-		source: AnimeSource,
-		candidate: PickerCandidate
-	) {
-		const notice = new Notice("Loading anime details...", 0);
-		let fields: ResolvedAnimeFields;
-		try {
-			if (source === "anilist") {
-				const aniListCandidate = candidate as PickerCandidate;
-				const details = await fetchAnimeDetails(aniListCandidate.id);
-				const bangumi = await findBangumiSubject([title, candidate.displayName]);
-				const alias = resolveAnimeOriginAlias(
-					this.settings.aliasesInTraditionalChinese ? "CN" : details.countryOfOrigin,
-					details.titleNative,
-					details.titleEnglish,
-					details.synonyms,
-					bangumi?.nameCn,
-					title
-				);
-				fields = {
-					studio: details.studios.length > 0 ? Array.from(new Set(details.studios)).map((studio) => `[[${studio}]]`) : undefined,
-					origin: details.countryOfOrigin ? countryAlpha2ToName(details.countryOfOrigin) : undefined,
-					released: details.releasedDate,
-					episodes: details.episodes,
-					cover: bangumi?.cover,
-					aliases: [alias ?? title],
-				};
-			} else if (source === "jikan") {
-				const details = await fetchAnimeDetailsJikan(candidate.id);
-				const bangumi = await findBangumiSubject([title, candidate.displayName]);
-				const alias = resolveAnimeOriginAlias(
-					this.settings.aliasesInTraditionalChinese ? "CN" : "JP",
-					details.titleJapanese,
-					details.titleEnglish,
-					details.synonyms,
-					bangumi?.nameCn,
-					title
-				);
-				fields = {
-					studio: details.studios.length > 0 ? Array.from(new Set(details.studios)).map((studio) => `[[${studio}]]`) : undefined,
-					origin: "[[🇯🇵 Japan]]",
-					released: details.releasedDate,
-					episodes: details.episodes,
-					cover: bangumi?.cover,
-					aliases: [alias ?? title],
-				};
-			} else {
-				const details = await fetchAnimeDetailsBangumi(candidate.id);
-				fields = {
-					studio: details.studios.length > 0 ? Array.from(new Set(details.studios)).map((studio) => `[[${studio}]]`) : undefined,
-					origin: "[[🇯🇵 Japan]]",
-					released: details.date,
-					episodes: details.episodes,
-					cover: details.cover,
-					aliases: [
-						resolveAnimeOriginAlias(
-							this.settings.aliasesInTraditionalChinese ? "CN" : "JP",
-							details.name,
-							undefined,
-							details.aliases,
-							details.nameCn,
-							title
-						) ?? title,
-					],
-				};
-			}
-		} catch (e) {
-			notice.hide();
-			console.error(e);
-			new Notice(`Loading anime details failed: ${(e as Error).message}`);
-			return;
-		}
-		notice.hide();
-
-		const filled: string[] = [];
-		const displayName = candidate.displayName;
-		await this.app.fileManager.processFrontMatter(file, (fm) => {
-			const trySet = (key: keyof ResolvedAnimeFields, targetKey: string) => {
-				const value = fields[key];
-				if (value === undefined || !isEmptyValue(fm[targetKey])) return;
-				fm[targetKey] = value;
-				filled.push(targetKey);
-			};
-			trySet("studio", "studio");
-			trySet("origin", "origin");
-			trySet("released", "released");
-			trySet("episodes", "episodes");
-			trySet("cover", "cover");
-			trySet("aliases", "aliases");
-		});
-		const sourceLabel = source === "anilist" ? "AniList" : source === "jikan" ? "Jikan" : "Bangumi";
-		new Notice(filled.length === 0
-			? `Matched "${displayName}" via ${sourceLabel}, but no empty fields needed filling.`
-			: `Filled from "${displayName}" (${sourceLabel}): ${filled.join(", ")}`);
 	}
 
 	private async fillBook(file: TFile, title: string) {

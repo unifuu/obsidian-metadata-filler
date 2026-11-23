@@ -1,7 +1,7 @@
 {
   "name": "obsidian-metadata-filler",
   "version": "1.0.0",
-  "description": "Obsidian plugin: fill game or anime metadata using IGDB, AniList, Jikan, and Bangumi",
+  "description": "Obsidian plugin: fill game or book metadata using IGDB, Google Books, Wikidata, and Open Library",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

@@ -1,4 +1,4 @@
-// AniList countryOfOrigin uses ISO 3166-1 alpha-2 codes.
+// Country codes are normalized to the wiki-link format used by note metadata.
 export const COUNTRY_ALPHA2_MAP: Record<string, string> = {
 	JP: "[[🇯🇵 Japan]]",
 	KR: "[[🇰🇷 South Korea]]",
